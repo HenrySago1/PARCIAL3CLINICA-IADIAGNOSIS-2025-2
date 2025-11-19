@@ -1,0 +1,22 @@
+# --- Ignorar carpetas de datos pesadas ---
+dataset/
+data/
+imagenes_prueba/
+
+# --- Ignorar archivos temporales de Python ---
+__pycache__/
+*.pyc
+
+# --- Ignorar entornos virtuales (muy importante) ---
+venv/
+env/
+.env
+
+# --- Ignorar archivos del sistema operativo ---
+.DS_Store
+Thumbs.db
+
+# --- (Opcional) Ignorar modelos viejos si tienes muchos ---
+# *.h5
+# Solo queremos subir el bueno:
+!modelo_aprecia_pro.keras
