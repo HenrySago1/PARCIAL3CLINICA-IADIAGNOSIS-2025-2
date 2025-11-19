@@ -7,7 +7,7 @@ import io
 app = Flask(__name__)
 
 # --- CONFIGURACIÓN ---
-MODELO_PATH = 'modelo_aprecia_pro.keras' # Asegúrate de usar tu mejor modelo
+MODELO_PATH = 'modelo_aprecia_pro.h5' # Asegúrate de usar tu mejor modelo
 CLASES = ['cataract', 'glaucoma', 'normal'] # Tus 3 clases finales
 
 print("Cargando modelo en memoria... espera un momento...")
