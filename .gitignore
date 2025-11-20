@@ -19,4 +19,4 @@ Thumbs.db
 # --- (Opcional) Ignorar modelos viejos si tienes muchos ---
 # *.h5
 # Solo queremos subir el bueno:
-!modelo_aprecia_pro.keras
+modelo_aprecia_pro.keras
