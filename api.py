@@ -1,77 +1,88 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import tensorflow as tf
 import numpy as np
 from PIL import Image
 import io
-
-app = Flask(__name__)
+import logging
 
 # --- CONFIGURACIÓN ---
-MODELO_PATH = 'modelo_aprecia_pro.h5' # Asegúrate de usar tu mejor modelo
-CLASES = ['cataract', 'glaucoma', 'normal'] # Tus 3 clases finales
+# Asegúrate de que este sea el nombre de tu archivo .h5 en GitHub
+MODEL_PATH = 'modelo_aprecia_pro.h5' 
+IMG_SIZE = 224
+CLASES = ['cataract', 'glaucoma', 'normal'] 
 
-print("Cargando modelo en memoria... espera un momento...")
-model = tf.keras.models.load_model(MODELO_PATH)
-print("¡Modelo cargado y listo para recibir pacientes! 🚀")
+# Configurar logging para ver errores en Render
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__)
+CORS(app) # Permite que Laravel se conecte desde cualquier lado
+
+# --- CARGAR EL MODELO AL INICIO ---
+try:
+    logger.info("Cargando modelo... esto puede tardar unos segundos.")
+    # Cargamos el modelo .h5 que es compatible universalmente
+    model = tf.keras.models.load_model(MODEL_PATH)
+    logger.info(f"¡Modelo cargado exitosamente! Clases: {CLASES}")
+except Exception as e:
+    logger.error(f"❌ ERROR CRÍTICO cargando modelo: {e}")
+    model = None
 
 def preparar_imagen(image_bytes):
-    """Transforma los bytes que llegan de internet en algo que la IA entienda"""
-    # 1. Abrir la imagen desde los bytes
+    """Transforma los bytes de la imagen para que la IA la entienda"""
     img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
-    # 2. Redimensionar a 224x224 (Lo que pide MobileNetV2)
-    img = img.resize((224, 224))
-    # 3. Convertir a array de números
+    img = img.resize((IMG_SIZE, IMG_SIZE))
     img_array = tf.keras.utils.img_to_array(img)
-    # 4. Expandir dimensiones (de (224,224,3) a (1,224,224,3))
-    img_array = tf.expand_dims(img_array, 0)
+    img_array = tf.expand_dims(img_array, 0) 
     return img_array
 
+# --- RUTA 1: LA PREDICCIÓN (Para Laravel) ---
 @app.route('/api/prediccion', methods=['POST'])
 def predecir():
     if model is None:
         return jsonify({'error': 'El modelo de IA no está disponible'}), 500
 
-    # 1. DEBUG: Ver qué está llegando
-    print("--- NUEVA PETICIÓN RECIBIDA ---")
-    print(f"Archivos recibidos: {request.files.keys()}")
-    
-    # 2. Validación del campo 'imagen'
     if 'imagen' not in request.files:
-        print("❌ ERROR 400: No encontré la clave 'imagen' en el POST.")
         return jsonify({'error': 'No se envió el campo "imagen"'}), 400
     
     file = request.files['imagen']
-    print(f"Nombre del archivo: '{file.filename}'")
-
-    # 3. Validación del nombre de archivo
     if file.filename == '':
-        print("❌ ERROR 400: El nombre del archivo está vacío.")
         return jsonify({'error': 'Archivo vacío'}), 400
 
     try:
-        # 4. Preprocesamiento
-        img_array = preparar_imagen(file.read())
+        logger.info(f"Procesando imagen: {file.filename}")
         
-        # 5. Predicción
+        # Procesar y Predecir
+        img_array = preparar_imagen(file.read())
         predictions = model.predict(img_array)
         score = predictions[0]
         
+        # Calcular resultado
         indice_ganador = np.argmax(score)
         clase_ganadora = CLASES[indice_ganador]
-        confianza = float(np.max(score) * 100) 
+        confianza = float(np.max(score) * 100)
         
-        print(f"✅ ÉXITO: {clase_ganadora} ({confianza:.2f}%)")
+        logger.info(f"Resultado: {clase_ganadora.upper()} ({confianza:.2f}%)")
 
         return jsonify({
             'resultado': clase_ganadora,
             'probabilidad': confianza,
-            'mensaje': 'Análisis completado exitosamente'
+            'mensaje': 'Exito'
         })
 
     except Exception as e:
-        print(f"❌ ERROR INTERNO (500): {e}")
+        logger.error(f"Error durante la predicción: {e}")
         return jsonify({'error': str(e)}), 500
-    
+
+# --- RUTA 2: SALUD (Para saber si está vivo) ---
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'online', 
+        'model_loaded': model is not None,
+        'message': 'La IA esta despierta y lista 🤖'
+    })
+
 if __name__ == '__main__':
-    # Ejecutar servidor en el puerto 5000
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, port=5000, host='0.0.0.0')
